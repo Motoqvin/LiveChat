@@ -14,7 +14,7 @@ public static class IdentityExtensions
     {
         serviceCollection.AddDbContext<ChatDbContext>(options =>
         {
-            var connectionString = configuration.GetConnectionString("SqlDb");
+            var connectionString = Environment.GetEnvironmentVariable("SQLDB");
             options.UseNpgsql(connectionString);
         });
 

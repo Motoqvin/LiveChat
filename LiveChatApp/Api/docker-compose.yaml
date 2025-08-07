@@ -13,7 +13,7 @@ services:
   api:
     container_name: chat-api
     build:
-      context: ./LiveChatApp
+      context: .
     ports:
       - "8000:80"
     depends_on:
@@ -21,6 +21,16 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__Default=Host=db;Port=5432;Database=postgres;Username=postgres;Password=mysecretpassword;
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
 
 volumes:
   db:
+  redis-data:

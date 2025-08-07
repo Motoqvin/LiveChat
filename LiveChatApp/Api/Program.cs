@@ -8,6 +8,7 @@ using LiveChatApp.Models;
 using LiveChatApp.Options;
 using LiveChatApp.Services;
 using LiveChatApp.Services.Base;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
@@ -20,12 +21,26 @@ builder.Services.AddOpenApi();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    ConnectionMultiplexer.Connect(Environment.GetEnvironmentVariable("REDIS") ?? ""));
+    ConnectionMultiplexer.Connect("localhost:6379,abortConnect=false"));
 
+builder.Services.AddSingleton(resolver =>
+    resolver.GetRequiredService<IOptions<JwtOptions>>().Value);
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+builder.Services.AddRazorPages();
 builder.Services.AddSignalR().AddStackExchangeRedis(options =>
     {
-        var redisConnectionString = Environment.GetEnvironmentVariable("REDIS") ?? "";
+        var redisConnectionString = "localhost:6379,abortConnect=false";
         if (string.IsNullOrEmpty(redisConnectionString))
         {
             throw new InvalidOperationException("Redis connection string is not configured.");
@@ -33,7 +48,13 @@ builder.Services.AddSignalR().AddStackExchangeRedis(options =>
         options.Configuration = ConfigurationOptions.Parse(redisConnectionString);
     });
 
-builder.Services.AddOptions<JwtOptions>();
+builder.Services.AddOptions<JwtOptions>().Configure(options =>
+{
+    options.SignatureKey = Environment.GetEnvironmentVariable("JWT_KEY") ?? "";
+    options.Audience = "MyAudience";
+    options.LifetimeInMinutes = 60;
+    options.Issuer = "MyIssuer";
+});
 
 builder.Services.InitAspnetIdentity(builder.Configuration);
 builder.Services.InitAuth();
@@ -52,7 +73,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+
+app.UseCors();
 
 app.MapHub<ChatHub>("/chatHub");
 
@@ -121,7 +149,7 @@ app.MapPost("/login", async (LoginDto dto,
     return Results.Ok(new { tokenStr });
 });
 
-app.MapPost("/api/messages", async (
+app.MapPost("/api/messages", [Authorize] async (
     MessageDto dto,
     IChatService chatService,
     IHubContext<ChatHub> hubContext) =>
@@ -129,9 +157,16 @@ app.MapPost("/api/messages", async (
     await chatService.SaveMessageAsync(dto);
     await hubContext.Clients.Group(dto.Room).SendAsync("ReceiveMessage", dto);
     return Results.Ok();
-}).RequireAuthorization();
+});
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.MapGet("/api/messages/{room}", [Authorize] async (
+    string room,
+    IChatService chatService) =>
+{
+    var messages = await chatService.GetMessagesAsync(room);
+    return Results.Ok(messages);
+});
+
+app.MapRazorPages();
 
 app.Run();
