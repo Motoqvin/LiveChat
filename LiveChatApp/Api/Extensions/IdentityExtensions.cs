@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CVMatcherApp.Api.Extensions;
+
 public static class IdentityExtensions
 {
     public static void InitAspnetIdentity(this IServiceCollection serviceCollection, IConfiguration configuration)
@@ -22,7 +23,8 @@ public static class IdentityExtensions
             .AddEntityFrameworkStores<ChatDbContext>();
     }
 
-    public async static Task SeedRolesAsync(this WebApplication app) {
+    public async static Task SeedRolesAsync(this WebApplication app)
+    {
         var scope = app.Services.CreateScope();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
@@ -30,7 +32,8 @@ public static class IdentityExtensions
         await roleManager.CreateAsync(new IdentityRole("Admin"));
     }
 
-    public static void InitAuth(this IServiceCollection services) {
+    public static void InitAuth(this IServiceCollection services)
+    {
         var jwtOptions = services.BuildServiceProvider().GetRequiredService<IOptions<JwtOptions>>().Value;
         services.AddAuthentication(options =>
         {
@@ -38,6 +41,8 @@ public static class IdentityExtensions
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultSignInScheme = JwtBearerDefaults.AuthenticationScheme;
+
+
         })
             .AddJwtBearer(options =>
             {
@@ -58,6 +63,25 @@ public static class IdentityExtensions
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(keyBytes)
                 };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+
+                        if (!string.IsNullOrEmpty(accessToken) &&
+                            path.StartsWithSegments("/chatHub"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                };
             });
+
+
     }
 }

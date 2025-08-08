@@ -10,6 +10,7 @@ using LiveChatApp.Services;
 using LiveChatApp.Services.Base;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -37,7 +38,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddRazorPages();
 builder.Services.AddSignalR().AddStackExchangeRedis(options =>
     {
         var redisConnectionString = "localhost:6379,abortConnect=false";
@@ -72,20 +72,17 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
-app.UseStaticFiles();
 app.UseRouting();
+
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-
-app.UseCors();
-
 app.MapHub<ChatHub>("/chatHub");
 
 app.MapPost("/register", async (
-    RegisterDto dto,
+    [FromBody] RegisterDto dto,
     UserManager<User> userManager) =>
 {
     var user = new User { UserName = dto.Username, Email = dto.Email };
@@ -97,7 +94,7 @@ app.MapPost("/register", async (
     return Results.Ok("User registered.");
 });
 
-app.MapPost("/login", async (LoginDto dto,
+app.MapPost("/login", async ([FromBody] LoginDto dto,
     SignInManager<User> signInManager,
     UserManager<User> userManager,
     JwtOptions jwtOptions) =>
@@ -146,7 +143,7 @@ app.MapPost("/login", async (LoginDto dto,
     var handler = new JwtSecurityTokenHandler();
     var tokenStr = handler.WriteToken(token);
 
-    return Results.Ok(new { tokenStr });
+    return Results.Ok(new { token = tokenStr, Username = foundUser.UserName, foundUser.Email });
 });
 
 app.MapPost("/api/messages", [Authorize] async (
@@ -159,14 +156,12 @@ app.MapPost("/api/messages", [Authorize] async (
     return Results.Ok();
 });
 
-app.MapGet("/api/messages/{room}", [Authorize] async (
+app.MapGet("/api/messages/{room}", async (
     string room,
     IChatService chatService) =>
 {
     var messages = await chatService.GetMessagesAsync(room);
     return Results.Ok(messages);
 });
-
-app.MapRazorPages();
 
 app.Run();
