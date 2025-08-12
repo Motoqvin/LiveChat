@@ -1,53 +1,65 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const [login, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const handleLogin = async (e : any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
 
-    const res = await fetch("http://localhost:5250/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ Login: login, Password: password }),
-    });
+    try {
+      const res = await fetch("http://localhost:5250/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ Login: username, Password: password }),
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      localStorage.setItem("token", data.tokenStr);
-      router.push("/");
-    } else if (res.status === 401) {
-        console.log(res.status)
-      alert("Invalid credentials");
-    }
-    else if (res.status === 500) {
-      alert("Server error, please try again later.");
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("userName", data.username);
+        router.push("/rooms");
+      } else {
+        const data = await res.json();
+        console.log(data)
+        setError(data.message || "Login failed");
+      }
+    } catch {
+      setError("Failed to connect to the server");
     }
   };
 
   return (
-    <form onSubmit={handleLogin} className="p-6 max-w-sm mx-auto">
-      <input
-        type="text"
-        placeholder="Username"
-        value={login}
-        onChange={(e) => setUsername(e.target.value)}
-        className="border p-2 mb-2 w-full"
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="border p-2 mb-2 w-full"
-      />
-      <button type="submit" className="bg-blue-500 text-white px-4 py-2">
-        Login
-      </button>
-    </form>
+    <div className="max-w-md mx-auto mt-20 p-4 border rounded shadow">
+      <h1 className="text-2xl mb-4">Login</h1>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <input
+          type="mail"
+          placeholder="Email"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          className="border p-2 rounded"
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          className="border p-2 rounded"
+        />
+        <button type="submit" className="bg-green-600 text-white p-2 rounded">
+          Login
+        </button>
+        {error && <p className="text-red-600">{error}</p>}
+      </form>
+    </div>
   );
 }

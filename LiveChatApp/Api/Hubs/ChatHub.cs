@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
 namespace LiveChatApp.Hubs;
+
 public class ChatHub : Hub
 {
     private readonly IChatService _service;
@@ -11,29 +12,23 @@ public class ChatHub : Hub
     {
         _service = service;
     }
+
     public async Task JoinRoom(string room)
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, room);
 
-        var userName = Context.User?.Identity?.Name ?? "Unknown";
-
-        await Clients.Group(room).SendAsync("SystemMessage", $"{userName} joined the room.");
+        var history = await _service.GetMessagesAsync(room);
+        await Clients.Caller.SendAsync("LoadHistory", history);
     }
 
-    public async Task SendMessage(string user, string message)
+    public async Task SendMessage(MessageDto message)
     {
-        await Clients.All.SendAsync("ReceiveMessage", user, message);
+        await _service.SaveMessageAsync(message);
 
-        var mes = new MessageDto
-        {
-            User = user,
-            Message = message,
-            Room = Context.GetHttpContext()?.Request.Query["room"].ToString() ?? string.Empty
-        };
-
-        await _service.SaveMessageAsync(mes);
+        await Clients.Group(message.Room)
+            .SendAsync("ReceiveMessage", message);
         
-        await Clients.Group(mes.Room).SendAsync("ReceiveMessage", mes);
+        await Clients.AllExcept(Context.ConnectionId).SendAsync("RoomActivity", message.Room);
     }
 
     public async Task LeaveRoom(string room)

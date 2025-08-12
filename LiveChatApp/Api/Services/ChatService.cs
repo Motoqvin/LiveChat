@@ -15,23 +15,19 @@ public class ChatService : IChatService
         _db = redis.GetDatabase();
     }
     
-    public async Task<List<MessageDto>> GetMessagesAsync(string room)
-    {
-        string key = $"room:{room}:messages";
-        var messages = await _db.ListRangeAsync(key);
-
-        return messages
-            .Select(m => JsonSerializer.Deserialize<MessageDto>(m!)!)
-            .ToList();
-    }
-
     public async Task SaveMessageAsync(MessageDto message)
     {
-        string key = $"room:{message.Room}:messages";
-        string json = JsonSerializer.Serialize(message);
+        var json = JsonSerializer.Serialize(message);
 
-        await _db.ListRightPushAsync(key, json);
+        await _db.ListRightPushAsync($"chat:{message.Room}", json);
+    }
 
-        await _db.ListTrimAsync(key, -MaxMessages, -1);
+    public async Task<List<MessageDto>> GetMessagesAsync(string room)
+    {
+        var messages = await _db.ListRangeAsync($"chat:{room}", -MaxMessages, -1);
+
+        return messages
+            .Select(x => JsonSerializer.Deserialize<MessageDto>(x!)!)
+            .ToList();
     }
 }
