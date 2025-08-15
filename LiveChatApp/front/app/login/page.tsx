@@ -24,7 +24,7 @@ export default function LoginPage() {
         const data = await res.json();
         localStorage.setItem("token", data.token);
         localStorage.setItem("userName", data.username);
-        router.push("/rooms");
+        router.push("/");
       } else {
         const data = await res.json();
         console.log(data)
@@ -59,6 +59,12 @@ export default function LoginPage() {
           Login
         </button>
         {error && <p className="text-red-600">{error}</p>}
+        <p className="text-sm">
+          Don't have an account?{" "}
+          <a href="/register" className="text-blue-600 hover:underline">
+            Register here
+          </a>
+        </p>
       </form>
     </div>
   );
